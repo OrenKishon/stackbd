@@ -14,4 +14,4 @@ else
     dd if=/dev/urandom of=$file_dev bs=1024 count=100000
 fi
 
-losetup $loop_dev $file_dev
+sudo losetup $loop_dev $file_dev

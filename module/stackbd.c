@@ -14,7 +14,8 @@
 
 #include <trace/events/block.h>
 
-#define STACKBD_NAME "stackbd"
+#include "../common/stackbd.h"
+
 #define STACKBD_BDEV_MODE (FMODE_READ | FMODE_WRITE | FMODE_EXCL)
 #define DEBUGGG printk("stackbd: %d\n", __LINE__);
 
@@ -168,7 +169,7 @@ static int stackbd_start(char dev_path[])
 
     DEBUGGG;
     if (!(stackbd.bdev_raw = stackbd_bdev_open(dev_path)))
-        return -ENOMEM;
+        return -EFAULT;
 
     /* Set up our internal device */
     stackbd.capacity = get_capacity(stackbd.bdev_raw->bd_disk);
@@ -202,7 +203,6 @@ error_after_bdev:
     return -EFAULT;
 }
 
-#if 0
 static int stackbd_ioctl(struct block_device *bdev, fmode_t mode,
 		     unsigned int cmd, unsigned long arg)
 {
@@ -211,7 +211,7 @@ static int stackbd_ioctl(struct block_device *bdev, fmode_t mode,
 
     switch (cmd)
     {
-    case MIDBD_DO_IT:
+    case STACKBD_DO_IT:
         printk("\n*** DO IT!!!!!!! ***\n\n");
 
         if (copy_from_user(dev_path, argp, sizeof(dev_path)))
@@ -223,7 +223,6 @@ static int stackbd_ioctl(struct block_device *bdev, fmode_t mode,
         return -ENOTTY;
     }
 }
-#endif
 
 /*
  * The HDIO_GETGEO ioctl is handled in blkdev_ioctl(), which
@@ -248,7 +247,8 @@ int stackbd_getgeo(struct block_device * block_device, struct hd_geometry * geo)
  */
 static struct block_device_operations stackbd_ops = {
 		.owner  = THIS_MODULE,
-		.getgeo = stackbd_getgeo
+		.getgeo = stackbd_getgeo,
+        .ioctl  = stackbd_ioctl,
 };
 
 static int __init stackbd_init(void)
@@ -282,21 +282,20 @@ static int __init stackbd_init(void)
 	stackbd.gd->first_minor = 0;
 	stackbd.gd->fops = &stackbd_ops;
 	stackbd.gd->private_data = &stackbd;
-	strcpy(stackbd.gd->disk_name, STACKBD_NAME "0");
+	strcpy(stackbd.gd->disk_name, STACKBD_NAME_0);
 	stackbd.gd->queue = stackbd.queue;
 	add_disk(stackbd.gd);
 
     printk("stackbd: init done\n");
 
-//	return 0;
-    return stackbd_start("/dev/loop0");
+	return 0;
 
 error_after_redister_blkdev:
 	unregister_blkdev(major_num, STACKBD_NAME);
 error_after_alloc_queue:
     blk_cleanup_queue(stackbd.queue);
 
-	return -ENOMEM;
+	return -EFAULT;
 }
 
 static void __exit stackbd_exit(void)
