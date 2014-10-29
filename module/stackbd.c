@@ -18,22 +18,19 @@
 
 #define STACKBD_BDEV_MODE (FMODE_READ | FMODE_WRITE | FMODE_EXCL)
 #define DEBUGGG printk("stackbd: %d\n", __LINE__);
-
-MODULE_LICENSE("Dual BSD/GPL");
-//static char *Version = "1.4";
-
-static int major_num = 0;
-module_param(major_num, int, 0);
-static int LOGICAL_BLOCK_SIZE = 512;
-module_param(LOGICAL_BLOCK_SIZE, int, 0);
-static int nsectors = 1024; /* How big the drive is */
-module_param(nsectors, int, 0);
-
 /*
  * We can tweak our hardware sector size, but the kernel talks to us
  * in terms of small sectors, always.
  */
 #define KERNEL_SECTOR_SIZE 512
+
+
+MODULE_LICENSE("Dual BSD/GPL");
+
+static int major_num = 0;
+module_param(major_num, int, 0);
+static int LOGICAL_BLOCK_SIZE = 512;
+module_param(LOGICAL_BLOCK_SIZE, int, 0);
 
 /*
  * The internal representation of our device.
@@ -62,7 +59,6 @@ static void stackbd_io_fn(struct bio *bio)
 //
 //    if (lba != EMPTY_REAL_LBA)
 //        bio->bi_sector = lba;
-    DEBUGGG;
     bio->bi_bdev = stackbd.bdev_raw;
 
     trace_block_bio_remap(bdev_get_queue(stackbd.bdev_raw), bio,
@@ -78,12 +74,11 @@ static int stackbd_threadfn(void *data)
 
     set_user_nice(current, -20);
 
-    DEBUGGG;
     while (!kthread_should_stop())
     {
-        DEBUGGG;
         /* wake_up() is after adding bio to list. No need for condition */ 
-        wait_event_interruptible(req_event, !bio_list_empty(&stackbd.bio_list));
+        wait_event_interruptible(req_event, kthread_should_stop() ||
+                !bio_list_empty(&stackbd.bio_list));
 
         spin_lock_irq(&stackbd.lock);
         if (bio_list_empty(&stackbd.bio_list))
@@ -106,7 +101,10 @@ static int stackbd_threadfn(void *data)
  */
 static void stackbd_make_request(struct request_queue *q, struct bio *bio)
 {
-    printk("\n<%p> stackbd: ~~~ make request (%llu) ~~~", bio, bio->bi_sector);
+    printk("stackbd: make request %-5s block %-12llu #pages %-4hu total-size "
+            "%-10u\n", bio_data_dir(bio) == WRITE ? "write" : "read",
+            bio->bi_sector, bio->bi_vcnt, bio->bi_size);
+
 //    printk("<%p> Make request %s %s %s\n", bio,
 //           bio->bi_rw & REQ_SYNC ? "SYNC" : "",
 //           bio->bi_rw & REQ_FLUSH ? "FLUSH" : "",
@@ -167,7 +165,6 @@ static int stackbd_start(char dev_path[])
 {
     unsigned max_sectors;
 
-    DEBUGGG;
     if (!(stackbd.bdev_raw = stackbd_bdev_open(dev_path)))
         return -EFAULT;
 
@@ -219,7 +216,6 @@ static int stackbd_ioctl(struct block_device *bdev, fmode_t mode,
 
         return stackbd_start(dev_path);
     default:
-        DEBUGGG;
         return -ENOTTY;
     }
 }
