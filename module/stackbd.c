@@ -187,7 +187,7 @@ static int stackbd_start(char dev_path[])
         goto error_after_bdev;
     }
 
-    printk("stackbd: done initializing successfuly\n");
+    printk("stackbd: done initializing successfully\n");
     stackbd.is_active = 1;
     wake_up_process(stackbd.thread);
 
